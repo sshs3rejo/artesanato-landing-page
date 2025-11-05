@@ -1,72 +1,107 @@
 document.addEventListener('DOMContentLoaded', () => {
-
     const navbarToggler = document.querySelector('.navbar-toggler');
     const navMenu = document.getElementById('navbarNav');
     const navLinks = document.querySelectorAll('.navbar-nav .nav-item a');
+    const navbarNav = document.querySelector('.navbar-nav');
+    
     const activeLine = document.createElement('span');
     activeLine.classList.add('active-line');
-    document.querySelector('.navbar-nav').appendChild(activeLine);
+    if (navbarNav) {
+        navbarNav.appendChild(activeLine);
+    }
 
     function positionActiveLine() {
-        const activeLink = document.querySelector('.navbar-nav .nav-item.active a');
-        if (activeLink && window.innerWidth >= 900) {
-            activeLine.style.width = activeLink.offsetWidth + 'px';
-            activeLine.style.left = activeLink.offsetLeft + 'px';
-            activeLine.style.opacity = 1;
+        const activeItem = document.querySelector('.navbar-nav .nav-item.active');
+        if (activeItem && window.innerWidth >= 900) {
+            const activeLink = activeItem.querySelector('a');
+            if (activeLink) {
+                activeLine.style.width = activeLink.offsetWidth + 'px';
+                activeLine.style.left = activeLink.offsetLeft + 'px';
+                activeLine.style.opacity = '1';
+            }
         } else {
-            activeLine.style.opacity = 0;
+            activeLine.style.opacity = '0'; 
         }
     }
 
     if (navbarToggler && navMenu) {
-        navbarToggler.addEventListener('click', () => {
-            navMenu.classList.toggle('active');
-            const isExpanded = navMenu.classList.contains('active');
+        const toggleMenu = () => {
+            const isExpanded = navMenu.classList.toggle('active');
             navbarToggler.setAttribute('aria-expanded', isExpanded);
             navbarToggler.innerHTML = isExpanded ? '×' : '☰';
+        };
+
+        navbarToggler.addEventListener('click', toggleMenu);
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth < 900 && navMenu.classList.contains('active')) {
+                    toggleMenu(); 
+                }
+            });
         });
     }
 
-    // --- LÓGICA DO INTERSECTION OBSERVER (APENAS PARA NAVBAR) ---
-    const sections = document.querySelectorAll('section[id]');
-    
-    const observerOptions = {
-        root: null,
-        rootMargin: '0px',
-        threshold: 0.6 // 60% da seção precisa estar visível
-    };
+    const sections = Array.from(document.querySelectorAll('section[id]'));
 
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                // ATIVA O LINK DA NAVBAR
-                const currentSectionId = entry.target.id;
-                navLinks.forEach(link => {
-                    link.closest('.nav-item').classList.remove('active');
-                    if (link.getAttribute('href').endsWith(currentSectionId)) {
-                        link.closest('.nav-item').classList.add('active');
-                        positionActiveLine(); // Atualiza a "barrinha"
-                    }
-                });
+    function clearActive() {
+        navLinks.forEach(link => link.closest('.nav-item').classList.remove('active'));
+    }
+
+    function markActiveBySectionId(id) {
+        clearActive();
+        navLinks.forEach(link => {
+            const hrefId = link.getAttribute('href') ? link.getAttribute('href').replace('#','') : '';
+            if (hrefId === id) {
+                link.closest('.nav-item').classList.add('active');
             }
         });
-    }, observerOptions);
+        positionActiveLine();
+    }
 
-    // Observa todas as seções
-    sections.forEach(section => {
-        observer.observe(section);
-    });
+    function getCurrentSectionByViewport() {
+        const refY = window.innerHeight * 0.45;
+        let best = null;
+        let bestDist = Infinity;
 
-    // Posição inicial da linha (no 'Home')
-    setTimeout(() => {
-        const homeLink = document.querySelector('.navbar-nav .nav-item a[href="#home-section"]');
-        if (homeLink) {
-            homeLink.closest('.nav-item').classList.add('active');
-            positionActiveLine();
-        }
-    }, 100);
+        sections.forEach(sec => {
+            const rect = sec.getBoundingClientRect();
+            if (rect.top <= refY && rect.bottom >= refY) {
+                best = sec;
+                bestDist = 0;
+                return;
+            }
+            const secCenter = rect.top + rect.height / 2;
+            const dist = Math.abs(secCenter - refY);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = sec;
+            }
+        });
+        return best ? best.id : null;
+    }
 
-    // Reposiciona a linha ao redimensionar a janela
+    let ticking = false;
+    function onScrollOrResize() {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+            const id = getCurrentSectionByViewport();
+            if (id) markActiveBySectionId(id);
+            ticking = false;
+        });
+    }
+
+    window.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('resize', onScrollOrResize);
+    onScrollOrResize();
+
+    const homeLink = document.querySelector('.navbar-nav .nav-item a[href="#home-section"]');
+    if (homeLink) {
+        homeLink.closest('.nav-item').classList.add('active');
+        positionActiveLine();
+    }
+
     window.addEventListener('resize', () => {
         positionActiveLine();
         if (window.innerWidth >= 900 && navMenu.classList.contains('active')) {
@@ -76,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Lógica da Galeria de Artesanatos ---
     const galleryItems = [
         { src: 'img/artesanato1.jpg', alt: 'Cesta de palha artesanal', title: 'Cesta de Palha', description: 'Cesta tecida à mão com fibras naturais, ideal para decoração ou uso diário.' },
         { src: 'img/artesanato2.jpg', alt: 'Escultura de madeira rústica', title: 'Escultura em Madeira', description: 'Obra de arte entalhada em madeira rústica, representando a fauna local.' },
@@ -118,5 +152,5 @@ document.addEventListener('DOMContentLoaded', () => {
             modal.style.display = 'none';
         }
     });
-
 });
+
